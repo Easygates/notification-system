@@ -18,6 +18,44 @@ export function ensureWorkspace() {
 async function seedWorkspace() {
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(817302)`);
+    await tx.execute(sql`
+      CREATE TABLE IF NOT EXISTS "pick_requests" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "order_number" varchar(40) NOT NULL,
+        "customer" varchar(120) DEFAULT '' NOT NULL,
+        "message" text NOT NULL,
+        "priority" varchar(12) DEFAULT 'normal' NOT NULL,
+        "status" varchar(16) DEFAULT 'pending' NOT NULL,
+        "attachment" text,
+        "attachment_name" varchar(180),
+        "created_by" varchar(80) NOT NULL,
+        "picked_by" varchar(80),
+        "completed_by" varchar(80),
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "picked_at" timestamp with time zone,
+        "completed_at" timestamp with time zone
+      )
+    `);
+    await tx.execute(sql`
+      CREATE TABLE IF NOT EXISTS "request_events" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "request_id" uuid NOT NULL REFERENCES "pick_requests"("id") ON DELETE CASCADE,
+        "order_number" varchar(40) NOT NULL,
+        "actor" varchar(80) NOT NULL,
+        "action" varchar(24) NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      )
+    `);
+    await tx.execute(sql`
+      CREATE TABLE IF NOT EXISTS "workspace_settings" (
+        "id" integer PRIMARY KEY DEFAULT 1 NOT NULL,
+        "sound_enabled" boolean DEFAULT true NOT NULL,
+        "tone" varchar(16) DEFAULT 'chime' NOT NULL,
+        "repeat_seconds" integer DEFAULT 15 NOT NULL,
+        "duration_seconds" integer DEFAULT 0 NOT NULL,
+        "volume" integer DEFAULT 65 NOT NULL
+      )
+    `);
     await tx.insert(workspaceSettings).values({ id: 1 }).onConflictDoNothing();
     const existing = await tx.select({ id: pickRequests.id }).from(pickRequests).limit(1);
     if (existing.length) return;

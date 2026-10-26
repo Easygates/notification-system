@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { pickRequests, requestEvents } from "@/db/schema";
+import { ensureWorkspace } from "@/lib/workspace";
 import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const body = await request.json();
     if (!["pending", "picking", "completed"].includes(body.status)) return Response.json({ error: "Choose a valid request status." }, { status: 400 });
     const actor = typeof body.actor === "string" ? body.actor.trim().slice(0, 80) : "Warehouse team";
+    await ensureWorkspace();
     const result = await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(pickRequests).where(eq(pickRequests.id, id)).for("update");
       if (!existing) return null;
